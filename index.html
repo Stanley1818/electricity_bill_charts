@@ -1,0 +1,1942 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社區電費紀錄圖表</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        /* 全局設置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* 載入畫面 */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        .loading-text {
+            color: white;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .loading-progress {
+            width: 200px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .loading-progress-bar {
+            height: 100%;
+            background: white;
+            width: 0%;
+            animation: progress 3s ease-in-out;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        @keyframes progress {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeInUp 1s ease 3.5s forwards;
+        }
+
+        /* 標題動畫 */
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 40px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            background: linear-gradient(45deg, #667eea, #764ba2, #f093fb, #f5576c);
+            background-size: 400% 400%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: neonGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes neonGlow {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Tab 樣式 */
+        .meter-tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+            gap: 20px;
+        }
+
+        .meter-tab {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .meter-tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .meter-tab:not(.active) {
+            background: #e0e0e0;
+            color: #34495e;
+        }
+
+        .meter-tab:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 設備說明區塊 */
+        .info-panel {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: slideInUp 0.8s ease forwards;
+        }
+
+        .info-header {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            padding: 15px 25px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s ease;
+        }
+
+        .info-header:hover {
+            background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
+        }
+
+        .info-title {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .info-toggle {
+            font-size: 1.2em;
+            transition: transform 0.3s ease;
+        }
+
+        .info-toggle.rotated {
+            transform: rotate(180deg);
+        }
+
+        .info-content {
+            max-height: 1000px;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: white;
+            padding: 25px;
+        }
+
+        .info-content.collapsed {
+            max-height: 0;
+            padding: 0 25px;
+        }
+
+        .equipment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .equipment-category {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            border-left: 4px solid #3498db;
+            opacity: 0;
+            transform: translateX(-20px);
+            animation: slideInLeft 0.6s ease forwards;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            min-width: 0;
+        }
+
+        .equipment-category:nth-child(1) { animation-delay: 0.2s; }
+        .equipment-category:nth-child(2) { animation-delay: 0.4s; }
+        .equipment-category:nth-child(3) { animation-delay: 0.6s; }
+        .equipment-category:nth-child(4) { animation-delay: 0.8s; }
+        .equipment-category:nth-child(5) { animation-delay: 1.0s; }
+        .equipment-category:nth-child(6) { animation-delay: 1.2s; }
+
+        .equipment-category h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 1.1em;
+        }
+
+        .equipment-category ul {
+            margin: 0;
+            padding-left: 20px;
+            list-style-type: none;
+        }
+
+        .equipment-category li {
+            margin-bottom: 5px;
+            color: #34495e;
+            font-size: 0.9em;
+            position: relative;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.4;
+            padding-right: 5px;
+        }
+
+        .equipment-category li:before {
+            content: "▸";
+            color: #3498db;
+            margin-right: 8px;
+        }
+
+        .info-note {
+            background: linear-gradient(135deg, #ecf0f1 0%, #bdc3c7 100%);
+            border-radius: 10px;
+            padding: 15px;
+            border-left: 4px solid #f39c12;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: slideInUp 0.6s ease 1.4s forwards;
+        }
+
+        .info-note p {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+
+        /* 圖表區域 */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            min-width: 0;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: slideInUp 0.8s ease forwards;
+        }
+
+        .chart-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .chart-title {
+            text-align: center;
+            color: #34495e;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 450px;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        /* 自定義圖例 */
+        .custom-legend {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .legend-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            background: white;
+            color: #666;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Microsoft JhengHei', sans-serif;
+        }
+
+        .legend-btn:hover {
+            border-color: #bbb;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .legend-btn.active {
+            border-color: #3498db;
+            background: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+
+        .legend-btn.active .legend-color {
+            border: 2px solid white;
+        }
+
+        .legend-btn:not(.active) {
+            opacity: 0.6;
+        }
+
+        .legend-btn:not(.active) .legend-color {
+            opacity: 0.5;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+
+        /* 統計卡片 */
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transform: scale(0.9);
+            animation: popIn 0.6s ease forwards;
+        }
+
+        .summary-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
+        }
+
+        .summary-card .value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .summary-card .unit {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        /* 動畫定義 */
+        @keyframes slideInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInLeft {
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes popIn {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* 動畫延遲類 */
+        .delay-1 { animation-delay: 0.2s; }
+        .delay-2 { animation-delay: 0.4s; }
+        .delay-3 { animation-delay: 0.6s; }
+        .delay-4 { animation-delay: 0.8s; }
+        .delay-5 { animation-delay: 1.0s; }
+        .delay-6 { animation-delay: 1.2s; }
+        .delay-7 { animation-delay: 1.4s; }
+        .delay-8 { animation-delay: 1.6s; }
+        .delay-9 { animation-delay: 1.8s; }
+        .delay-10 { animation-delay: 2.0s; }
+        .delay-11 { animation-delay: 2.2s; }
+        .delay-12 { animation-delay: 2.4s; }
+        .delay-13 { animation-delay: 2.6s; }
+        .delay-14 { animation-delay: 2.8s; }
+        .delay-15 { animation-delay: 3.0s; }
+        .delay-16 { animation-delay: 3.2s; }
+        .delay-17 { animation-delay: 3.4s; }
+        .delay-18 { animation-delay: 3.6s; }
+        .delay-19 { animation-delay: 3.8s; }
+        .delay-20 { animation-delay: 4.0s; }
+
+        .hidden {
+            display: none;
+        }
+
+        /* 響應式設計 */
+        @media (max-width: 1024px) {
+            .equipment-grid {
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 15px;
+            }
+            
+            .equipment-category {
+                padding: 12px;
+            }
+            
+            .equipment-category h4 {
+                font-size: 1.05em;
+                line-height: 1.3;
+            }
+            
+            .equipment-category li {
+                font-size: 0.85em;
+                line-height: 1.5;
+                word-break: break-word;
+                hyphens: auto;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 15px;
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            h1 {
+                font-size: 2em;
+                margin-bottom: 30px;
+            }
+            
+            .chart-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .chart-container {
+                padding: 20px 15px;
+            }
+            
+            .chart-title {
+                font-size: 1.2em;
+                margin-bottom: 15px;
+            }
+            
+            .chart-wrapper {
+                height: 400px; /* 增加高度 */
+            }
+            
+            .summary-cards {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 15px;
+            }
+            
+            .summary-card {
+                padding: 20px 15px;
+            }
+            
+            .summary-card .value {
+                font-size: 1.5em;
+            }
+            
+            /* 修正設備說明區塊的文字溢出問題 */
+            .equipment-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            
+            .equipment-category {
+                margin-bottom: 15px;
+                padding: 15px;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            }
+            
+            .equipment-category h4 {
+                font-size: 1em;
+                margin-bottom: 8px;
+                line-height: 1.3;
+                word-wrap: break-word;
+            }
+            
+            .equipment-category ul {
+                margin: 0;
+                padding-left: 15px;
+            }
+            
+            .equipment-category li {
+                font-size: 0.85em;
+                line-height: 1.4;
+                margin-bottom: 3px;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                word-break: break-word;
+                hyphens: auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 15px 10px;
+                margin: 5px;
+                border-radius: 10px;
+            }
+            
+            h1 {
+                font-size: 1.6em;
+                margin-bottom: 20px;
+            }
+            
+            .chart-container {
+                padding: 15px 10px;
+                border-radius: 10px;
+            }
+            
+            .chart-title {
+                font-size: 1.1em;
+                margin-bottom: 10px;
+            }
+            
+            .chart-wrapper {
+                height: 350px; /* 增加高度 */
+            }
+            
+            .summary-cards {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+            
+            .summary-card {
+                padding: 15px 10px;
+                border-radius: 10px;
+            }
+            
+            .summary-card h3 {
+                font-size: 0.9em;
+            }
+            
+            /* 小螢幕下的設備說明區塊優化 */
+            .equipment-category {
+                margin-bottom: 12px;
+                padding: 12px;
+            }
+            
+            .equipment-category h4 {
+                font-size: 0.95em;
+                margin-bottom: 6px;
+            }
+            
+            .equipment-category li {
+                font-size: 0.8em;
+                line-height: 1.3;
+                margin-bottom: 2px;
+            }
+            
+            .info-panel {
+                margin-bottom: 20px;
+            }
+            
+            .info-header {
+                padding: 12px 15px;
+                font-size: 1em;
+            }
+            
+            .info-content {
+                padding: 15px;
+            }
+            
+            /* Tab按鈕響應式優化 */
+            .tab-buttons {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .tab-btn {
+                width: 100%;
+                text-align: center;
+                font-size: 0.9em;
+                padding: 12px 15px;
+            }
+            
+            /* 圖例按鈕響應式優化 */
+            .custom-legend {
+                gap: 8px;
+                margin-top: 15px;
+            }
+            
+            .legend-btn {
+                font-size: 11px;
+                padding: 6px 12px;
+            }
+            
+            .legend-color {
+                width: 12px;
+                height: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 載入畫面 -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">載入中...</div>
+        <div class="loading-progress">
+            <div class="loading-progress-bar"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>🏢 社區電費紀錄分析圖表</h1>
+        
+        <!-- Tab 切換器 -->
+        <div class="meter-tabs">
+            <button class="meter-tab active" data-meter="01-87-8905-01-7">01-87-8905-01-7 管委會電費支出</button>
+            <button class="meter-tab" data-meter="01-87-8906-01-8">01-87-8906-01-8 各戶攤提公共電費</button>
+        </div>
+
+        <!-- 第一個電表內容 -->
+        <div id="meterContent-01-87-8905-01-7">
+            <!-- 電表設備說明區塊 -->
+            <div class="info-panel delay-1">
+                <div class="info-header" onclick="toggleInfo('infoContent1', 'infoToggle1')">
+                    <span class="info-title">📋 電表涵蓋設備說明</span>
+                    <span class="info-toggle" id="infoToggle1">▼</span>
+                </div>
+                <div class="info-content" id="infoContent1">
+                    <div class="equipment-grid">
+                        <div class="equipment-category delay-2">
+                            <h4>🚨 消防系統</h4>
+                            <ul>
+                                <li>EPFB3盤-B2F消防機房（灌水）</li>
+                                <li>EPFB2盤-B2F消防機房（灌水）</li>
+                                <li>EPFR2盤-R2消防機房（灌水）</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="equipment-category delay-3">
+                            <h4>💧 水系統設備</h4>
+                            <ul>
+                                <li>EPWB3盤-B3F日用水箱</li>
+                                <li>EPSB3盤-B3F淨水設備</li>
+                                <li>EPSB31盤-B3F廢水泵浦</li>
+                                <li>EPSB32盤-B3F雨水泵浦</li>
+                                <li>PWB3盤-B3F噴灌系統</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="equipment-category delay-4">
+                            <h4>🌬️ 通風系統</h4>
+                            <ul>
+                                <li>EPF1盤-1F進排風機</li>
+                                <li>EPFR1盤-R2進排風機</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="equipment-category delay-5">
+                            <h4>❄️ 空調系統</h4>
+                            <ul>
+                                <li>AC1盤-1F公設空調、媽媽教室</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="equipment-category delay-6">
+                            <h4>💡 照明系統</h4>
+                            <ul>
+                                <li>L1盤-1F景觀燈</li>
+                                <li>EL1盤-119F公設廊道照明、媽媽教室</li>
+                                <li>EL2盤-2F瑜珈教室、健身房</li>
+                                <li>ELR盤-R1R3景觀燈、課輔教室</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="equipment-category delay-7">
+                            <h4>🏢 其他設施</h4>
+                            <ul>
+                                <li>EPSB1盤-B1F垃圾儲藏室</li>
+                                <li>ELB1A盤-B1F防災中心</li>
+                                <li>ER1盤-1F收發室、櫃台、閱讀區、媽媽教室</li>
+                                <li>EPR3盤-R3電梯機房</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="info-note delay-8">
+                        <p><strong>📌 說明：</strong>此電表（01-87-8905-01-7）涵蓋社區公共設施用電，包含消防、給排水、照明、空調及電梯等重要設備。</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 圖表區域 -->
+            <div class="chart-grid">
+                <div class="chart-container delay-9">
+                    <div class="chart-title">💰 繳費總金額趨勢</div>
+                    <div class="chart-wrapper">
+                        <canvas id="totalAmountChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-container delay-10">
+                    <div class="chart-title">⚡ 各時段用電量趨勢</div>
+                    <div class="chart-wrapper">
+                        <canvas id="usageChart"></canvas>
+                    </div>
+                    <div class="custom-legend">
+                        <button class="legend-btn active" data-dataset="peak">
+                            <span class="legend-color" style="background-color: #f39c12;"></span>
+                            經常(尖峰)度數 (kWh)
+                        </button>
+                        <button class="legend-btn active" data-dataset="satHalfPeak">
+                            <span class="legend-color" style="background-color: #3498db;"></span>
+                            週六半尖峰度數 (kWh)
+                        </button>
+                        <button class="legend-btn active" data-dataset="offPeak">
+                            <span class="legend-color" style="background-color: #2ecc71;"></span>
+                            離峰度數 (kWh)
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chart-grid">
+                <div class="chart-container delay-11">
+                    <div class="chart-title">📊 用電量分佈堆疊圖</div>
+                    <div class="chart-wrapper">
+                        <canvas id="stackedChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-container delay-12">
+                    <div class="chart-title">🔍 總用電量趨勢</div>
+                    <div class="chart-wrapper">
+                        <canvas id="totalUsageChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 年度對比圖表區域 -->
+            <div style="margin-top: 50px;">
+                <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px; font-size: 2em;">📈 2024 vs 2025 年度同期對比</h2>
+                
+                <div class="chart-grid">
+                    <div class="chart-container delay-13">
+                        <div class="chart-title">🔥 經常(尖峰)度數年度對比</div>
+                        <div class="chart-wrapper">
+                            <canvas id="peakComparisonChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container delay-14">
+                        <div class="chart-title">⚡ 週六半尖峰度數年度對比</div>
+                        <div class="chart-wrapper">
+                            <canvas id="satHalfPeakComparisonChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chart-grid">
+                    <div class="chart-container delay-15">
+                        <div class="chart-title">🌙 離峰度數年度對比</div>
+                        <div class="chart-wrapper">
+                            <canvas id="offPeakComparisonChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container delay-16">
+                        <div class="chart-title">📊 綜合年度對比摘要</div>
+                        <div class="chart-wrapper">
+                            <canvas id="overallComparisonChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="summary-cards">
+                <div class="summary-card delay-17">
+                    <h3>平均月電費</h3>
+                    <div class="value" id="avgAmount">-</div>
+                    <div class="unit">元</div>
+                </div>
+                <div class="summary-card delay-18">
+                    <h3>平均月用電量</h3>
+                    <div class="value" id="avgUsage">-</div>
+                    <div class="unit">kWh</div>
+                </div>
+                <div class="summary-card delay-19">
+                    <h3>最高月電費</h3>
+                    <div class="value" id="maxAmount">-</div>
+                    <div class="unit">元</div>
+                </div>
+                <div class="summary-card delay-20">
+                    <h3>最高月用電量</h3>
+                    <div class="value" id="maxUsage">-</div>
+                    <div class="unit">kWh</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第二個電表內容（預設隱藏） -->
+        <div id="meterContent-01-87-8906-01-8" style="display:none;">
+            <!-- 電表設備說明區塊 -->
+            <div class="info-panel delay-1">
+                <div class="info-header" onclick="toggleInfo('infoContent2', 'infoToggle2')">
+                    <span class="info-title">📋 電表涵蓋設備說明</span>
+                    <span class="info-toggle" id="infoToggle2">▼</span>
+                </div>
+                <div class="info-content" id="infoContent2">
+                    <div class="equipment-grid">
+                        <div class="equipment-category delay-2">
+                            <h4>🚨 消防系統</h4>
+                            <ul>
+                                <li>EPFB3盤-B2F消防機房（泡沫）</li>
+                            </ul>
+                        </div>
+                        <div class="equipment-category delay-3">
+                            <h4>🌬️ 通風系統</h4>
+                            <ul>
+                                <li>PVB3盤-B3F進風機房</li>
+                                <li>PVB31盤-B3F排風機房</li>
+                                <li>PVB2盤-B2F進風機房</li>
+                                <li>PVB21盤-B2F排風機房</li>
+                                <li>PVB1盤-B1F進風機房</li>
+                                <li>PVB11盤-B1F排風機房</li>
+                            </ul>
+                        </div>
+                        <div class="equipment-category delay-4">
+                            <h4>🔋 發電/充電系統</h4>
+                            <ul>
+                                <li>GP1盤-B2F發電機房</li>
+                                <li>VCB1盤-汽車充電</li>
+                            </ul>
+                        </div>
+                        <div class="equipment-category delay-5">
+                            <h4>💡 其他設施</h4>
+                            <ul>
+                                <li>ELB1盤-B1F~B3F停車場之電動捲門、照明、指引燈、機車充電</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="info-note delay-6">
+                        <p><strong>📌 說明：</strong>此電表（01-87-8906-01-8）涵蓋停車場、消防、通風、發電、充電等設施用電。</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 第二個電表的圖表將在JavaScript中動態生成 -->
+            <div id="meter2Charts"></div>
+        </div>
+    </div>
+
+    <script>
+        // 載入動畫控制
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                document.getElementById('loadingScreen').style.opacity = '0';
+                setTimeout(function() {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                }, 500);
+            }, 3000);
+        });
+
+        // 切換設備說明區塊
+        function toggleInfo(contentId, toggleId) {
+            const content = document.getElementById(contentId);
+            const toggle = document.getElementById(toggleId);
+            
+            if (content.classList.contains('collapsed')) {
+                // 展開
+                content.classList.remove('collapsed');
+                toggle.classList.add('rotated');
+                toggle.textContent = '▲';
+            } else {
+                // 收起
+                content.classList.add('collapsed');
+                toggle.classList.remove('rotated');
+                toggle.textContent = '▼';
+            }
+        }
+
+        // 數值計數動畫
+        function animateValue(element, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const current = Math.floor(progress * (end - start) + start);
+                element.textContent = current.toLocaleString();
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // Tab 切換邏輯
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabs = document.querySelectorAll('.meter-tab');
+            const content1 = document.getElementById('meterContent-01-87-8905-01-7');
+            const content2 = document.getElementById('meterContent-01-87-8906-01-8');
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    // 移除所有active類
+                    tabs.forEach(t => t.classList.remove('active'));
+                    
+                    // 添加active類到當前tab
+                    this.classList.add('active');
+                    
+                    // 切換內容
+                    if (this.dataset.meter === '01-87-8905-01-7') {
+                        content1.style.display = '';
+                        content2.style.display = 'none';
+                    } else {
+                        content1.style.display = 'none';
+                        content2.style.display = '';
+                        // 如果第二個電表的圖表還沒創建，則創建它們
+                        if (!document.getElementById('meter2ContractMaxChart')) {
+                            renderMeter2Charts();
+                        }
+                    }
+                });
+            });
+
+            // 等待Chart.js載入完成
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js 未載入');
+                return;
+            }
+
+            // 第一個電表資料
+            const electricityData = [
+                { date: '2023-12-30', dateDisplay: '2023/12', totalAmount: 53645, peakUsage: 6000, satHalfPeakUsage: 1120, offPeakUsage: 4800, totalUsage: 11920 },
+                { date: '2024-02-29', dateDisplay: '2024/03', totalAmount: 51362, peakUsage: 4880, satHalfPeakUsage: 880, offPeakUsage: 6080, totalUsage: 11840 },
+                { date: '2024-03-31', dateDisplay: '2024/04', totalAmount: 47922, peakUsage: 4560, satHalfPeakUsage: 1040, offPeakUsage: 4800, totalUsage: 10400 },
+                { date: '2024-04-30', dateDisplay: '2024/05', totalAmount: 54197, peakUsage: 5520, satHalfPeakUsage: 960, offPeakUsage: 5360, totalUsage: 11840 },
+                { date: '2024-05-31', dateDisplay: '2024/06', totalAmount: 63981, peakUsage: 6240, satHalfPeakUsage: 1520, offPeakUsage: 6560, totalUsage: 14320 },
+                { date: '2024-06-30', dateDisplay: '2024/07', totalAmount: 66056, peakUsage: 6240, satHalfPeakUsage: 1200, offPeakUsage: 6000, totalUsage: 13440 },
+                { date: '2024-08-08', dateDisplay: '2024/08', totalAmount: 76067, peakUsage: 7360, satHalfPeakUsage: 1360, offPeakUsage: 5680, totalUsage: 14400 },
+                { date: '2024-09-08', dateDisplay: '2024/09', totalAmount: 82279, peakUsage: 8240, satHalfPeakUsage: 1760, offPeakUsage: 6320, totalUsage: 16320 },
+                { date: '2024-10-08', dateDisplay: '2024/10', totalAmount: 79011, peakUsage: 7760, satHalfPeakUsage: 1440, offPeakUsage: 5760, totalUsage: 14960 },
+                { date: '2024-11-08', dateDisplay: '2024/11', totalAmount: 75860, peakUsage: 7200, satHalfPeakUsage: 1760, offPeakUsage: 7440, totalUsage: 16400 },
+                { date: '2024-12-08', dateDisplay: '2024/12', totalAmount: 69586, peakUsage: 6400, satHalfPeakUsage: 1200, offPeakUsage: 5680, totalUsage: 13280 },
+                { date: '2025-01-08', dateDisplay: '2025/01', totalAmount: 63641, peakUsage: 5680, satHalfPeakUsage: 1120, offPeakUsage: 4640, totalUsage: 11440 },
+                { date: '2025-02-08', dateDisplay: '2025/02', totalAmount: 61424, peakUsage: 5120, satHalfPeakUsage: 1280, offPeakUsage: 4800, totalUsage: 11200 },
+                { date: '2025-03-08', dateDisplay: '2025/03', totalAmount: 59022, peakUsage: 4560, satHalfPeakUsage: 720, offPeakUsage: 5760, totalUsage: 11040 },
+                { date: '2025-04-08', dateDisplay: '2025/04', totalAmount: 58467, peakUsage: 4880, satHalfPeakUsage: 960, offPeakUsage: 4400, totalUsage: 10240 },
+                { date: '2025-05-08', dateDisplay: '2025/05', totalAmount: 65367, peakUsage: 5600, satHalfPeakUsage: 1360, offPeakUsage: 5360, totalUsage: 12320 },
+                { date: '2025-06-08', dateDisplay: '2025/06', totalAmount: 63084, peakUsage: 5440, satHalfPeakUsage: 1200, offPeakUsage: 4880, totalUsage: 11520 }
+            ];
+
+            // 第二個電表資料
+            const meter2Data = [
+                { period: '2024/03/13 - 2024/04/11', contractKW: 61, maxKW: 7, totalKWh: 3960, baseFee: 10565.2, flowFee: 11755.9, totalFee: 21986 },
+                { period: '2024/04/12 - 2024/05/14', contractKW: 61, maxKW: 21, totalKWh: 4360, baseFee: 10565.2, flowFee: 14213.6, totalFee: 24407 },
+                { period: '2024/05/15 - 2024/06/12', contractKW: 61, maxKW: 8, totalKWh: 3880, baseFee: 12230.5, flowFee: 12937.7, totalFee: 24791 },
+                { period: '2024/06/13 - 2024/07/11', contractKW: 61, maxKW: 25, totalKWh: 4000, baseFee: 14408.2, flowFee: 15000.0, totalFee: 28000 },
+                { period: '2024/07/12 - 2024/08/13', contractKW: 61, maxKW: 24, totalKWh: 4840, baseFee: 14408.2, flowFee: 16649.6, totalFee: 30592 },
+                { period: '2024/08/14 - 2024/09/12', contractKW: 61, maxKW: 30, totalKWh: 4240, baseFee: 14408.2, flowFee: 14585.6, totalFee: 28559 },
+                { period: '2024/09/13 - 2024/10/14', contractKW: 61, maxKW: 31, totalKWh: 5120, baseFee: 12871.0, flowFee: 17209.6, totalFee: 29629 },
+                { period: '2024/10/15 - 2024/11/13', contractKW: 61, maxKW: 69, totalKWh: 4760, baseFee: 10565.2, flowFee: 18324.3, totalFee: 31400 },
+                { period: '2024/11/14 - 2024/12/12', contractKW: 61, maxKW: 32, totalKWh: 4400, baseFee: 10565.2, flowFee: 17028.0, totalFee: 27179 },
+                { period: '2024/12/13 - 2025/01/12', contractKW: 61, maxKW: 54, totalKWh: 4640, baseFee: 10565.2, flowFee: 17956.8, totalFee: 28094 },
+                { period: '2025/01/13 - 2025/02/11', contractKW: 61, maxKW: 29, totalKWh: 4600, baseFee: 10565.2, flowFee: 17802.0, totalFee: 27942 },
+                { period: '2025/02/12 - 2025/03/12', contractKW: 61, maxKW: 26, totalKWh: 4480, baseFee: 10565.2, flowFee: 17337.2, totalFee: 27484 },
+                { period: '2025/03/13 - 2025/04/13', contractKW: 61, maxKW: 42, totalKWh: 6000, baseFee: 10565.2, flowFee: 23220.0, totalFee: 33279 },
+                { period: '2025/04/14 - 2025/05/12', contractKW: 61, maxKW: 28, totalKWh: 4360, baseFee: 10565.2, flowFee: 16873.2, totalFee: 27027 },
+                { period: '2025/05/13 - 2025/06/10', contractKW: 30, maxKW: 26, totalKWh: 4400, baseFee: 8573.6, flowFee: 17346.6, totalFee: 25531 }
+            ];
+
+            // 初始化第一個電表的圖表
+            initializeCharts1();
+
+            // 第一個電表的圖表初始化
+            function initializeCharts1() {
+                // 提取資料
+                const labels = electricityData.map(d => d.dateDisplay);
+                const totalAmounts = electricityData.map(d => d.totalAmount);
+                const peakUsages = electricityData.map(d => d.peakUsage);
+                const satHalfPeakUsages = electricityData.map(d => d.satHalfPeakUsage);
+                const offPeakUsages = electricityData.map(d => d.offPeakUsage);
+                const totalUsages = electricityData.map(d => d.totalUsage);
+
+                // 檢測螢幕大小
+                const isMobile = window.innerWidth <= 480;
+                const isTablet = window.innerWidth <= 768;
+                
+                // 圖表配置 - 響應式調整
+                const commonOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: isMobile ? 'bottom' : 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: isMobile ? 10 : 20,
+                                font: {
+                                    size: isMobile ? 10 : 12
+                                },
+                                boxWidth: isMobile ? 10 : 12,
+                                boxHeight: isMobile ? 10 : 12
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            ticks: {
+                                font: {
+                                    size: isMobile ? 9 : 11
+                                },
+                                maxRotation: isMobile ? 45 : 0,
+                                minRotation: isMobile ? 45 : 0
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            ticks: {
+                                font: {
+                                    size: isMobile ? 9 : 11
+                                }
+                            }
+                        }
+                    }
+                };
+
+                // 1. 繳費總金額圖表
+                const totalAmountCtx = document.getElementById('totalAmountChart').getContext('2d');
+                new Chart(totalAmountCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '繳費總金額 (元)',
+                            data: totalAmounts,
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#e74c3c',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointRadius: 6
+                        }]
+                    },
+                    options: {
+                        ...commonOptions,
+                        scales: {
+                            ...commonOptions.scales,
+                            y: {
+                                ...commonOptions.scales.y,
+                                beginAtZero: false,
+                                ticks: {
+                                    ...commonOptions.scales.y.ticks,
+                                    callback: function(value) {
+                                        return value.toLocaleString() + '元';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // 2. 各時段用電量圖表（含自定義圖例）
+                let activeDatasets = ['peak', 'satHalfPeak', 'offPeak'];
+                const datasets = [
+                    {
+                        id: 'peak',
+                        label: '經常(尖峰)度數 (kWh)',
+                        data: peakUsages,
+                        borderColor: '#f39c12',
+                        backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0.4,
+                        pointBackgroundColor: '#f39c12',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6
+                    },
+                    {
+                        id: 'satHalfPeak',
+                        label: '週六半尖峰度數 (kWh)',
+                        data: satHalfPeakUsages,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0.4,
+                        pointBackgroundColor: '#3498db',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6
+                    },
+                    {
+                        id: 'offPeak',
+                        label: '離峰度數 (kWh)',
+                        data: offPeakUsages,
+                        borderColor: '#2ecc71',
+                        backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0.4,
+                        pointBackgroundColor: '#2ecc71',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6
+                    }
+                ];
+
+                const usageCtx = document.getElementById('usageChart').getContext('2d');
+                const usageChart = new Chart(usageCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: datasets
+                    },
+                    options: {
+                        ...commonOptions,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            ...commonOptions.scales,
+                            y: {
+                                ...commonOptions.scales.y,
+                                beginAtZero: true,
+                                ticks: {
+                                    ...commonOptions.scales.y.ticks,
+                                    callback: function(value) {
+                                        return value.toLocaleString() + ' kWh';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // 自定義圖例互動
+                document.querySelectorAll('.legend-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const datasetId = this.getAttribute('data-dataset');
+                        
+                        if (activeDatasets.includes(datasetId)) {
+                            if (activeDatasets.length > 1) {
+                                activeDatasets = activeDatasets.filter(id => id !== datasetId);
+                                this.classList.remove('active');
+                            }
+                        } else {
+                            activeDatasets.push(datasetId);
+                            this.classList.add('active');
+                        }
+                        
+                        usageChart.data.datasets = datasets.filter(dataset => activeDatasets.includes(dataset.id));
+                        usageChart.update();
+                    });
+                });
+
+                // 3. 用電量分佈堆疊圖
+                const stackedCtx = document.getElementById('stackedChart').getContext('2d');
+                new Chart(stackedCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: '經常(尖峰)度數 (kWh)',
+                                data: peakUsages,
+                                backgroundColor: 'rgba(243, 156, 18, 0.8)',
+                                borderColor: '#f39c12',
+                                borderWidth: 1
+                            },
+                            {
+                                label: '週六半尖峰度數 (kWh)',
+                                data: satHalfPeakUsages,
+                                backgroundColor: 'rgba(52, 152, 219, 0.8)',
+                                borderColor: '#3498db',
+                                borderWidth: 1
+                            },
+                            {
+                                label: '離峰度數 (kWh)',
+                                data: offPeakUsages,
+                                backgroundColor: 'rgba(46, 204, 113, 0.8)',
+                                borderColor: '#2ecc71',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        ...commonOptions,
+                        scales: {
+                            ...commonOptions.scales,
+                            x: {
+                                ...commonOptions.scales.x,
+                                stacked: true
+                            },
+                            y: {
+                                ...commonOptions.scales.y,
+                                stacked: true,
+                                beginAtZero: true,
+                                ticks: {
+                                    ...commonOptions.scales.y.ticks,
+                                    callback: function(value) {
+                                        return value.toLocaleString() + ' kWh';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // 4. 總用電量趨勢圖
+                const totalUsageCtx = document.getElementById('totalUsageChart').getContext('2d');
+                new Chart(totalUsageCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '總用電量 (kWh)',
+                            data: totalUsages,
+                            borderColor: '#9b59b6',
+                            backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#9b59b6',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointRadius: 6
+                        }]
+                    },
+                    options: {
+                        ...commonOptions,
+                        scales: {
+                            ...commonOptions.scales,
+                            y: {
+                                ...commonOptions.scales.y,
+                                beginAtZero: true,
+                                ticks: {
+                                    ...commonOptions.scales.y.ticks,
+                                    callback: function(value) {
+                                        return value.toLocaleString() + ' kWh';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // 年度對比資料準備
+                const comparisonMonths = ['03', '04', '05', '06'];
+                
+                const data2024 = electricityData.filter(d => 
+                    d.dateDisplay.includes('2024') && 
+                    comparisonMonths.some(month => d.dateDisplay.includes(`2024/${month}`))
+                ).sort((a, b) => a.dateDisplay.localeCompare(b.dateDisplay));
+                
+                const data2025 = electricityData.filter(d => 
+                    d.dateDisplay.includes('2025') && 
+                    comparisonMonths.some(month => d.dateDisplay.includes(`2025/${month}`))
+                ).sort((a, b) => a.dateDisplay.localeCompare(b.dateDisplay));
+
+                const comparisonLabels = comparisonMonths.map(month => `${month}月`);
+                
+                const peak2024 = comparisonMonths.map(month => {
+                    const found = data2024.find(d => d.dateDisplay.includes(`2024/${month}`));
+                    return found ? found.peakUsage : 0;
+                });
+                
+                const peak2025 = comparisonMonths.map(month => {
+                    const found = data2025.find(d => d.dateDisplay.includes(`2025/${month}`));
+                    return found ? found.peakUsage : 0;
+                });
+                
+                const satHalfPeak2024 = comparisonMonths.map(month => {
+                    const found = data2024.find(d => d.dateDisplay.includes(`2024/${month}`));
+                    return found ? found.satHalfPeakUsage : 0;
+                });
+                
+                const satHalfPeak2025 = comparisonMonths.map(month => {
+                    const found = data2025.find(d => d.dateDisplay.includes(`2025/${month}`));
+                    return found ? found.satHalfPeakUsage : 0;
+                });
+                
+                const offPeak2024 = comparisonMonths.map(month => {
+                    const found = data2024.find(d => d.dateDisplay.includes(`2024/${month}`));
+                    return found ? found.offPeakUsage : 0;
+                });
+                
+                const offPeak2025 = comparisonMonths.map(month => {
+                    const found = data2025.find(d => d.dateDisplay.includes(`2025/${month}`));
+                    return found ? found.offPeakUsage : 0;
+                });
+
+                // 年度對比圖表通用配置
+                const comparisonOptions = {
+                    ...commonOptions,
+                    plugins: {
+                        ...commonOptions.plugins,
+                        legend: {
+                            ...commonOptions.plugins.legend,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        ...commonOptions.scales,
+                        y: {
+                            ...commonOptions.scales.y,
+                            beginAtZero: true,
+                            ticks: {
+                                ...commonOptions.scales.y.ticks,
+                                callback: function(value) {
+                                    return value.toLocaleString() + ' kWh';
+                                }
+                            }
+                        }
+                    }
+                };
+
+                // 5. 經常(尖峰)度數年度對比圖表
+                const peakComparisonCtx = document.getElementById('peakComparisonChart').getContext('2d');
+                new Chart(peakComparisonCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: comparisonLabels,
+                        datasets: [
+                            {
+                                label: '2024年 經常(尖峰)度數',
+                                data: peak2024,
+                                backgroundColor: 'rgba(231, 76, 60, 0.7)',
+                                borderColor: '#e74c3c',
+                                borderWidth: 2
+                            },
+                            {
+                                label: '2025年 經常(尖峰)度數',
+                                data: peak2025,
+                                backgroundColor: 'rgba(243, 156, 18, 0.7)',
+                                borderColor: '#f39c12',
+                                borderWidth: 2
+                            }
+                        ]
+                    },
+                    options: comparisonOptions
+                });
+
+                // 6. 週六半尖峰度數年度對比圖表
+                const satHalfPeakComparisonCtx = document.getElementById('satHalfPeakComparisonChart').getContext('2d');
+                new Chart(satHalfPeakComparisonCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: comparisonLabels,
+                        datasets: [
+                            {
+                                label: '2024年 週六半尖峰度數',
+                                data: satHalfPeak2024,
+                                backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                                borderColor: '#3498db',
+                                borderWidth: 2
+                            },
+                            {
+                                label: '2025年 週六半尖峰度數',
+                                data: satHalfPeak2025,
+                                backgroundColor: 'rgba(155, 89, 182, 0.7)',
+                                borderColor: '#9b59b6',
+                                borderWidth: 2
+                            }
+                        ]
+                    },
+                    options: comparisonOptions
+                });
+
+                // 7. 離峰度數年度對比圖表
+                const offPeakComparisonCtx = document.getElementById('offPeakComparisonChart').getContext('2d');
+                new Chart(offPeakComparisonCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: comparisonLabels,
+                        datasets: [
+                            {
+                                label: '2024年 離峰度數',
+                                data: offPeak2024,
+                                backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                                borderColor: '#2ecc71',
+                                borderWidth: 2
+                            },
+                            {
+                                label: '2025年 離峰度數',
+                                data: offPeak2025,
+                                backgroundColor: 'rgba(26, 188, 156, 0.7)',
+                                borderColor: '#1abc9c',
+                                borderWidth: 2
+                            }
+                        ]
+                    },
+                    options: comparisonOptions
+                });
+
+                // 8. 綜合年度對比摘要圖表
+                const overallComparisonCtx = document.getElementById('overallComparisonChart').getContext('2d');
+                new Chart(overallComparisonCtx, {
+                    type: 'line',
+                    data: {
+                        labels: comparisonLabels,
+                        datasets: [
+                            {
+                                label: '2024年 總用電量',
+                                data: comparisonMonths.map((month, index) => 
+                                    peak2024[index] + satHalfPeak2024[index] + offPeak2024[index]
+                                ),
+                                borderColor: '#e74c3c',
+                                backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                                borderWidth: 3,
+                                fill: false,
+                                tension: 0.4,
+                                pointBackgroundColor: '#e74c3c',
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2,
+                                pointRadius: 6
+                            },
+                            {
+                                label: '2025年 總用電量',
+                                data: comparisonMonths.map((month, index) => 
+                                    peak2025[index] + satHalfPeak2025[index] + offPeak2025[index]
+                                ),
+                                borderColor: '#27ae60',
+                                backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                                borderWidth: 3,
+                                fill: false,
+                                tension: 0.4,
+                                pointBackgroundColor: '#27ae60',
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2,
+                                pointRadius: 6
+                            }
+                        ]
+                    },
+                    options: comparisonOptions
+                });
+
+                // 計算並顯示統計數據
+                calculateAndDisplayStats();
+            }
+
+            // 計算並顯示統計數據
+            function calculateAndDisplayStats() {
+                const avgAmount = Math.round(electricityData.reduce((sum, d) => sum + d.totalAmount, 0) / electricityData.length);
+                const avgUsage = Math.round(electricityData.reduce((sum, d) => sum + d.totalUsage, 0) / electricityData.length);
+                const maxAmount = Math.max(...electricityData.map(d => d.totalAmount));
+                const maxUsage = Math.max(...electricityData.map(d => d.totalUsage));
+
+                // 使用動畫效果顯示數值
+                setTimeout(() => {
+                    animateValue(document.getElementById('avgAmount'), 0, avgAmount, 2000);
+                    animateValue(document.getElementById('avgUsage'), 0, avgUsage, 2000);
+                    animateValue(document.getElementById('maxAmount'), 0, maxAmount, 2000);
+                    animateValue(document.getElementById('maxUsage'), 0, maxUsage, 2000);
+                }, 5000);
+            }
+
+            // 第二個電表的圖表創建函數
+            function renderMeter2Charts() {
+                const container = document.getElementById('meter2Charts');
+                container.innerHTML = `
+                <div class="chart-grid">
+                    <div class="chart-container delay-7">
+                        <div class="chart-title">📈 經常契約容量/最高需量趨勢</div>
+                        <div class="chart-wrapper">
+                            <canvas id="meter2ContractMaxChart"></canvas>
+                        </div>
+                        <div class="custom-legend" id="meter2Legend">
+                            <button class="legend-btn active" data-dataset="contractKW">
+                                <span class="legend-color" style="background-color: #f39c12;"></span>
+                                經常契約容量 (kW)
+                            </button>
+                            <button class="legend-btn active" data-dataset="maxKW">
+                                <span class="legend-color" style="background-color: #3498db;"></span>
+                                經常最高需量 (kW)
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-container delay-8">
+                        <div class="chart-title">🔋 總用電度數趨勢</div>
+                        <div class="chart-wrapper">
+                            <canvas id="meter2TotalKWhChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-grid">
+                    <div class="chart-container delay-9">
+                        <div class="chart-title">💵 基本電費趨勢</div>
+                        <div class="chart-wrapper">
+                            <canvas id="meter2BaseFeeChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-container delay-10">
+                        <div class="chart-title">💸 流動電費趨勢</div>
+                        <div class="chart-wrapper">
+                            <canvas id="meter2FlowFeeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 50px;">
+                    <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px; font-size: 2em;">📊 2024 vs 2025 年度同期對比</h2>
+                    <div class="chart-grid">
+                        <div class="chart-container delay-11">
+                            <div class="chart-title">總用電度數年度對比</div>
+                            <div class="chart-wrapper">
+                                <canvas id="meter2KWhCompare"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-container delay-12">
+                            <div class="chart-title">基本電費年度對比</div>
+                            <div class="chart-wrapper">
+                                <canvas id="meter2BaseFeeCompare"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-grid">
+                        <div class="chart-container delay-13">
+                            <div class="chart-title">流動電費年度對比</div>
+                            <div class="chart-wrapper">
+                                <canvas id="meter2FlowFeeCompare"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-container delay-14">
+                            <div class="chart-title">電費總金額年度對比</div>
+                            <div class="chart-wrapper">
+                                <canvas id="meter2TotalFeeCompare"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                `;
+
+                // 1. 經常契約容量/最高需量折線圖
+                const labels = meter2Data.map(d => d.period);
+                const contractKWs = meter2Data.map(d => d.contractKW);
+                const maxKWs = meter2Data.map(d => d.maxKW);
+                let meter2Active = ['contractKW', 'maxKW'];
+                const datasets = [
+                    {
+                        id: 'contractKW',
+                        label: '經常契約容量 (kW)',
+                        data: contractKWs,
+                        borderColor: '#f39c12',
+                        backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#f39c12',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    },
+                    {
+                        id: 'maxKW',
+                        label: '經常最高需量 (kW)',
+                        data: maxKWs,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#3498db',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    }
+                ];
+
+                const ctx1 = document.getElementById('meter2ContractMaxChart').getContext('2d');
+                const contractMaxChart = new Chart(ctx1, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 } } },
+                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 }, callback: v => v + ' kW' } }
+                        }
+                    }
+                });
+
+                // 自訂圖例互動
+                document.querySelectorAll('#meter2Legend .legend-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = this.getAttribute('data-dataset');
+                        if (meter2Active.includes(id)) {
+                            if (meter2Active.length > 1) {
+                                meter2Active = meter2Active.filter(x => x !== id);
+                                this.classList.remove('active');
+                            }
+                        } else {
+                            meter2Active.push(id);
+                            this.classList.add('active');
+                        }
+                        contractMaxChart.data.datasets = datasets.filter(ds => meter2Active.includes(ds.id));
+                        contractMaxChart.update();
+                    });
+                });
+
+                // 2. 總用電度數
+                new Chart(document.getElementById('meter2TotalKWhChart').getContext('2d'), {
+                    type: 'line',
+                    data: { 
+                        labels: labels, 
+                        datasets: [{
+                            label: '總用電度數 (kWh)', 
+                            data: meter2Data.map(d => d.totalKWh), 
+                            borderColor: '#2ecc71', 
+                            backgroundColor: 'rgba(46,204,113,0.1)', 
+                            borderWidth: 3, 
+                            fill: true, 
+                            tension: 0.4, 
+                            pointBackgroundColor: '#2ecc71', 
+                            pointBorderColor: '#fff', 
+                            pointBorderWidth: 2, 
+                            pointRadius: 6 
+                        }] 
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { legend: { position: 'top' } }, 
+                        scales: { 
+                            x: { grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 } } }, 
+                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 }, callback: v => v + ' kWh' } } 
+                        } 
+                    }
+                });
+
+                // 3. 基本電費
+                new Chart(document.getElementById('meter2BaseFeeChart').getContext('2d'), {
+                    type: 'line',
+                    data: { 
+                        labels: labels, 
+                        datasets: [{
+                            label: '基本電費 (元)', 
+                            data: meter2Data.map(d => d.baseFee), 
+                            borderColor: '#e74c3c', 
+                            backgroundColor: 'rgba(231,76,60,0.1)', 
+                            borderWidth: 3, 
+                            fill: true, 
+                            tension: 0.4, 
+                            pointBackgroundColor: '#e74c3c', 
+                            pointBorderColor: '#fff', 
+                            pointBorderWidth: 2, 
+                            pointRadius: 6 
+                        }] 
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { legend: { position: 'top' } }, 
+                        scales: { 
+                            x: { grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 } } }, 
+                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 }, callback: v => v + ' 元' } } 
+                        } 
+                    }
+                });
+
+                // 4. 流動電費
+                new Chart(document.getElementById('meter2FlowFeeChart').getContext('2d'), {
+                    type: 'line',
+                    data: { 
+                        labels: labels, 
+                        datasets: [{
+                            label: '流動電費 (元)', 
+                            data: meter2Data.map(d => d.flowFee), 
+                            borderColor: '#3498db', 
+                            backgroundColor: 'rgba(52,152,219,0.1)', 
+                            borderWidth: 3, 
+                            fill: true, 
+                            tension: 0.4, 
+                            pointBackgroundColor: '#3498db', 
+                            pointBorderColor: '#fff', 
+                            pointBorderWidth: 2, 
+                            pointRadius: 6 
+                        }] 
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { legend: { position: 'top' } }, 
+                        scales: { 
+                            x: { grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 } } }, 
+                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 }, callback: v => v + ' 元' } } 
+                        } 
+                    }
+                });
+
+                // 年度同期對比資料
+                const comparePeriods = [
+                    {
+                        label: '03/13 - 04/13',
+                        y2024: meter2Data.find(d => d.period === '2024/03/13 - 2024/04/11'),
+                        y2025: meter2Data.find(d => d.period === '2025/03/13 - 2025/04/13')
+                    },
+                    {
+                        label: '04/14 - 05/12',
+                        y2024: meter2Data.find(d => d.period === '2024/04/12 - 2024/05/14'),
+                        y2025: meter2Data.find(d => d.period === '2025/04/14 - 2025/05/12')
+                    },
+                    {
+                        label: '05/13 - 06/10',
+                        y2024: meter2Data.find(d => d.period === '2024/05/15 - 2024/06/12'),
+                        y2025: meter2Data.find(d => d.period === '2025/05/13 - 2025/06/10')
+                    }
+                ];
+
+                // 1. 總用電度數年度對比
+                new Chart(document.getElementById('meter2KWhCompare').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: comparePeriods.map(p => p.label),
+                        datasets: [
+                            {
+                                label: '2024年',
+                                data: comparePeriods.map(p => p.y2024 ? p.y2024.totalKWh : 0),
+                                backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                                borderColor: '#27ae60',
+                                borderWidth: 2
+                            },
+                            {
+                                label: '2025年',
+                                data: comparePeriods.map(p => p.y2025 ? p.y2025.totalKWh : 0),
+                                backgroundColor: 'rgba(243, 156, 18, 0.7)',
+                                borderColor: '#f39c12',
+                                borderWidth: 2
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top' } },
+                        scales: {
+                            x: { grid: { color: 'rgba(0,0,0,0.1)' } },
+                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { callback: v => v + ' kWh' } }
+                        }
+                    }
+                });
+
+                // 2. 基本電費年度對比
+                new Chart(document.getElementById('meter2BaseFeeCompare').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: comparePeriods.map(p => p.label),
+                        datasets: [
+                            {
+                                label: '2024年',
+                                data: comparePeriods.map(p => p.y2024 ? p.y2024.baseFee : 0),
+                                backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                                borderColor: '#2980b9',
+                                borderWidth: 2
+                            },
+                            {
+                                label: '2025年',
+                                data: comparePeriods.map(p => p.y2025 ? p.y2025.baseFee : 0),
+                                backgroundColor: 'rgba(155, 89, 182, 0.7)',
+                                borderColor: '#8e44ad',
+                                borderWidth: 2
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top' } },
+                        scales: {
+                            x: { grid: { color: 'rgba(0,0,0,0.1)' } },
+                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { callback: v => v + ' 元' } }
+                        }
+                    }
+                });
+
+                // 3. 流動電費年度對比
+                new Chart(document.getElementById('meter2FlowFeeCompare').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: comparePeriods.map(p => p.label),
+                        datasets: [
+                            {
+                                label: '2024年',
+                                data: comparePeriods.map(p => p.y2024 ? p.y2024.flowFee : 0),
+                                backgroundColor: 'rgba(231, 76, 60, 0.7)',
+                                borderColor: '#e74c3c',
+                                borderWidth: 2
+                            },
+                            {
+                                label: '2025年',
+                                data: comparePeriods.map(p => p.y2025 ? p.y2025.flowFee : 0),
+                                backgroundColor: 'rgba(243, 156, 18, 0.7)',
+                                borderColor: '#f39c12',
+                                borderWidth: 2
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top' } },
+                        scales: {
+                            x: { grid: { color: 'rgba(0,0,0,0.1)' } },
+                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { callback: v => v + ' 元' } }
+                        }
+                    }
+                });
+
+                // 4. 電費總金額年度對比
+                new Chart(document.getElementById('meter2TotalFeeCompare').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: comparePeriods.map(p => p.label),
+                        datasets: [
+                            {
+                                label: '2024年',
+                                data: comparePeriods.map(p => p.y2024 ? p.y2024.totalFee : 0),
+                                backgroundColor: 'rgba(155, 89, 182, 0.7)',
+                                borderColor: '#8e44ad',
+                                borderWidth: 2
+                            },
+                            {
+                                label: '2025年',
+                                data: comparePeriods.map(p => p.y2025 ? p.y2025.totalFee : 0),
+                                backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                                borderColor: '#27ae60',
+                                borderWidth: 2
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top' } },
+                        scales: {
+                            x: { grid: { color: 'rgba(0,0,0,0.1)' } },
+                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { callback: v => v + ' 元' } }
+                        }
+                    }
+                });
+            }
+
+            // 將renderMeter2Charts函數暴露到全局作用域
+            window.renderMeter2Charts = renderMeter2Charts;
+        });
+    </script>
+</body>
+</html>
+
