@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>社區電費紀錄圖表</title>
+    <title>社區電費紀錄圖表 - 動畫版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
         /* 全局設置 */
@@ -1552,6 +1552,12 @@
                 container.innerHTML = `
                 <div class="chart-grid">
                     <div class="chart-container delay-7">
+                        <div class="chart-title">💰 繳費總金額趨勢</div>
+                        <div class="chart-wrapper">
+                            <canvas id="meter2TotalAmountChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-container delay-8">
                         <div class="chart-title">📈 經常契約容量/最高需量趨勢</div>
                         <div class="chart-wrapper">
                             <canvas id="meter2ContractMaxChart"></canvas>
@@ -1567,24 +1573,28 @@
                             </button>
                         </div>
                     </div>
-                    <div class="chart-container delay-8">
+                </div>
+                <div class="chart-grid">
+                    <div class="chart-container delay-9">
                         <div class="chart-title">🔋 總用電度數趨勢</div>
                         <div class="chart-wrapper">
                             <canvas id="meter2TotalKWhChart"></canvas>
                         </div>
                     </div>
-                </div>
-                <div class="chart-grid">
-                    <div class="chart-container delay-9">
-                        <div class="chart-title">💵 基本電費趨勢</div>
-                        <div class="chart-wrapper">
-                            <canvas id="meter2BaseFeeChart"></canvas>
-                        </div>
-                    </div>
                     <div class="chart-container delay-10">
-                        <div class="chart-title">💸 流動電費趨勢</div>
+                        <div class="chart-title">💵💸 基本電費/流動電費趨勢</div>
                         <div class="chart-wrapper">
-                            <canvas id="meter2FlowFeeChart"></canvas>
+                            <canvas id="meter2FeesChart"></canvas>
+                        </div>
+                        <div class="custom-legend" id="meter2FeesLegend">
+                            <button class="legend-btn active" data-dataset="baseFee">
+                                <span class="legend-color" style="background-color: #e74c3c;"></span>
+                                基本電費 (元)
+                            </button>
+                            <button class="legend-btn active" data-dataset="flowFee">
+                                <span class="legend-color" style="background-color: #3498db;"></span>
+                                流動電費 (元)
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1621,8 +1631,40 @@
                 </div>
                 `;
 
-                // 1. 經常契約容量/最高需量折線圖
+                // 1. 繳費總金額趨勢圖表
                 const labels = meter2Data.map(d => d.period);
+                const totalAmounts = meter2Data.map(d => d.totalFee);
+                
+                new Chart(document.getElementById('meter2TotalAmountChart').getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '繳費總金額 (元)',
+                            data: totalAmounts,
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#e74c3c',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top' } },
+                        scales: {
+                            x: { grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 } } },
+                            y: { beginAtZero: false, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 }, callback: v => v.toLocaleString() + '元' } }
+                        }
+                    }
+                });
+
+                // 2. 經常契約容量/最高需量折線圖
                 const contractKWs = meter2Data.map(d => d.contractKW);
                 const maxKWs = meter2Data.map(d => d.maxKW);
                 let meter2Active = ['contractKW', 'maxKW'];
@@ -1691,7 +1733,7 @@
                     });
                 });
 
-                // 2. 總用電度數
+                // 3. 總用電度數
                 new Chart(document.getElementById('meter2TotalKWhChart').getContext('2d'), {
                     type: 'line',
                     data: { 
@@ -1721,64 +1763,73 @@
                     }
                 });
 
-                // 3. 基本電費
-                new Chart(document.getElementById('meter2BaseFeeChart').getContext('2d'), {
-                    type: 'line',
-                    data: { 
-                        labels: labels, 
-                        datasets: [{
-                            label: '基本電費 (元)', 
-                            data: meter2Data.map(d => d.baseFee), 
-                            borderColor: '#e74c3c', 
-                            backgroundColor: 'rgba(231,76,60,0.1)', 
-                            borderWidth: 3, 
-                            fill: true, 
-                            tension: 0.4, 
-                            pointBackgroundColor: '#e74c3c', 
-                            pointBorderColor: '#fff', 
-                            pointBorderWidth: 2, 
-                            pointRadius: 6 
-                        }] 
+                // 4. 基本電費/流動電費合併圖表
+                const baseFees = meter2Data.map(d => d.baseFee);
+                const flowFees = meter2Data.map(d => d.flowFee);
+                let meter2FeesActive = ['baseFee', 'flowFee'];
+                const feesDatasets = [
+                    {
+                        id: 'baseFee',
+                        label: '基本電費 (元)',
+                        data: baseFees,
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#e74c3c',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
                     },
-                    options: { 
-                        responsive: true, 
-                        maintainAspectRatio: false, 
-                        plugins: { legend: { position: 'top' } }, 
-                        scales: { 
-                            x: { grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 } } }, 
-                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 }, callback: v => v + ' 元' } } 
-                        } 
+                    {
+                        id: 'flowFee',
+                        label: '流動電費 (元)',
+                        data: flowFees,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#3498db',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    }
+                ];
+
+                const feesCtx = document.getElementById('meter2FeesChart').getContext('2d');
+                const feesChart = new Chart(feesCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: feesDatasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 } } },
+                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 }, callback: v => v.toLocaleString() + ' 元' } }
+                        }
                     }
                 });
 
-                // 4. 流動電費
-                new Chart(document.getElementById('meter2FlowFeeChart').getContext('2d'), {
-                    type: 'line',
-                    data: { 
-                        labels: labels, 
-                        datasets: [{
-                            label: '流動電費 (元)', 
-                            data: meter2Data.map(d => d.flowFee), 
-                            borderColor: '#3498db', 
-                            backgroundColor: 'rgba(52,152,219,0.1)', 
-                            borderWidth: 3, 
-                            fill: true, 
-                            tension: 0.4, 
-                            pointBackgroundColor: '#3498db', 
-                            pointBorderColor: '#fff', 
-                            pointBorderWidth: 2, 
-                            pointRadius: 6 
-                        }] 
-                    },
-                    options: { 
-                        responsive: true, 
-                        maintainAspectRatio: false, 
-                        plugins: { legend: { position: 'top' } }, 
-                        scales: { 
-                            x: { grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 } } }, 
-                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { size: 11 }, callback: v => v + ' 元' } } 
-                        } 
-                    }
+                // 基本電費/流動電費圖例互動
+                document.querySelectorAll('#meter2FeesLegend .legend-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = this.getAttribute('data-dataset');
+                        if (meter2FeesActive.includes(id)) {
+                            if (meter2FeesActive.length > 1) {
+                                meter2FeesActive = meter2FeesActive.filter(x => x !== id);
+                                this.classList.remove('active');
+                            }
+                        } else {
+                            meter2FeesActive.push(id);
+                            this.classList.add('active');
+                        }
+                        feesChart.data.datasets = feesDatasets.filter(ds => meter2FeesActive.includes(ds.id));
+                        feesChart.update();
+                    });
                 });
 
                 // 年度同期對比資料
@@ -1939,4 +1990,3 @@
     </script>
 </body>
 </html>
-
