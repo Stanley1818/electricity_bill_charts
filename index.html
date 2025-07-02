@@ -103,7 +103,7 @@
         h1 {
             text-align: center;
             color: #2c3e50;
-            margin-bottom: 40px;
+            margin-bottom: 10px;
             font-size: 2.5em;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
             background: linear-gradient(45deg, #667eea, #764ba2, #f093fb, #f5576c);
@@ -113,9 +113,42 @@
             animation: neonGlow 3s ease-in-out infinite;
         }
 
+        /* 更新日期樣式 */
+        .last-updated {
+            text-align: center;
+            margin-bottom: 30px;
+            opacity: 0;
+            transform: translateY(-20px);
+            animation: slideInDown 1s ease 0.2s forwards;
+        }
+
+        .last-updated span {
+            background: rgba(255, 255, 255, 0.9);
+            color: #34495e;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
         @keyframes neonGlow {
             0%, 100% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
+        }
+
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         @keyframes fadeInUp {
@@ -329,8 +362,53 @@
             width: 100%;
             margin-bottom: 15px;
         }
+        /* X軸切換按鈕樣式 */
+        .x-axis-toggle {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+            gap: 5px;
+        }
 
-        /* 自定義圖例 */
+        .toggle-btn {
+            padding: 8px 16px;
+            border: 2px solid #3498db;
+            background: white;
+            color: #3498db;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .toggle-btn.active {
+            background: #3498db;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        }
+
+        .toggle-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
+        }
+
+        .toggle-btn:not(.active):hover {
+            background: rgba(52, 152, 219, 0.1);
+        }
+
+        /* 響應式設計 - X軸切換按鈕 */
+        @media (max-width: 480px) {
+            .toggle-btn {
+                padding: 6px 12px;
+                font-size: 0.8em;
+            }
+        }
+
+        /* 自訂圖例樣式 */
         .custom-legend {
             display: flex;
             justify-content: center;
@@ -691,6 +769,9 @@
 
     <div class="container">
         <h1>🏢 社區電費紀錄分析圖表</h1>
+        <div class="last-updated">
+            <span>📅 資料最後更新日期：2025年7月2日</span>
+        </div>
         
         <!-- Tab 切換器 -->
         <div class="meter-tabs">
@@ -774,6 +855,10 @@
             <div class="chart-grid">
                 <div class="chart-container delay-9">
                     <div class="chart-title">💰 繳費總金額趨勢</div>
+                    <div class="x-axis-toggle" id="totalAmountToggle">
+                        <button class="toggle-btn active" data-mode="dateDisplay">繳費日期</button>
+                        <button class="toggle-btn" data-mode="billingPeriod">計費區間</button>
+                    </div>
                     <div class="chart-wrapper">
                         <canvas id="totalAmountChart"></canvas>
                     </div>
@@ -781,6 +866,10 @@
                 
                 <div class="chart-container delay-10">
                     <div class="chart-title">⚡ 各時段用電量趨勢</div>
+                    <div class="x-axis-toggle" id="usageToggle">
+                        <button class="toggle-btn active" data-mode="dateDisplay">繳費日期</button>
+                        <button class="toggle-btn" data-mode="billingPeriod">計費區間</button>
+                    </div>
                     <div class="chart-wrapper">
                         <canvas id="usageChart"></canvas>
                     </div>
@@ -804,6 +893,10 @@
             <div class="chart-grid">
                 <div class="chart-container delay-11">
                     <div class="chart-title">📊 用電量分佈堆疊圖</div>
+                    <div class="x-axis-toggle" id="stackedToggle">
+                        <button class="toggle-btn active" data-mode="dateDisplay">繳費日期</button>
+                        <button class="toggle-btn" data-mode="billingPeriod">計費區間</button>
+                    </div>
                     <div class="chart-wrapper">
                         <canvas id="stackedChart"></canvas>
                     </div>
@@ -811,6 +904,10 @@
                 
                 <div class="chart-container delay-12">
                     <div class="chart-title">🔍 總用電量趨勢</div>
+                    <div class="x-axis-toggle" id="totalUsageToggle">
+                        <button class="toggle-btn active" data-mode="dateDisplay">繳費日期</button>
+                        <button class="toggle-btn" data-mode="billingPeriod">計費區間</button>
+                    </div>
                     <div class="chart-wrapper">
                         <canvas id="totalUsageChart"></canvas>
                     </div>
@@ -1011,31 +1108,35 @@
 
             // 第一個電表資料
             const electricityData = [
-                { date: '2023-12-30', dateDisplay: '2023/12', totalAmount: 53645, peakUsage: 6000, satHalfPeakUsage: 1120, offPeakUsage: 4800, totalUsage: 11920 },
-                { date: '2024-02-29', dateDisplay: '2024/03', totalAmount: 51362, peakUsage: 4880, satHalfPeakUsage: 880, offPeakUsage: 6080, totalUsage: 11840 },
-                { date: '2024-03-31', dateDisplay: '2024/04', totalAmount: 47922, peakUsage: 4560, satHalfPeakUsage: 1040, offPeakUsage: 4800, totalUsage: 10400 },
-                { date: '2024-04-30', dateDisplay: '2024/05', totalAmount: 54197, peakUsage: 5520, satHalfPeakUsage: 960, offPeakUsage: 5360, totalUsage: 11840 },
-                { date: '2024-05-31', dateDisplay: '2024/06', totalAmount: 63981, peakUsage: 6240, satHalfPeakUsage: 1520, offPeakUsage: 6560, totalUsage: 14320 },
-                { date: '2024-06-30', dateDisplay: '2024/07', totalAmount: 66056, peakUsage: 6240, satHalfPeakUsage: 1200, offPeakUsage: 6000, totalUsage: 13440 },
-                { date: '2024-08-08', dateDisplay: '2024/08', totalAmount: 76067, peakUsage: 7360, satHalfPeakUsage: 1360, offPeakUsage: 5680, totalUsage: 14400 },
-                { date: '2024-09-08', dateDisplay: '2024/09', totalAmount: 82279, peakUsage: 8240, satHalfPeakUsage: 1760, offPeakUsage: 6320, totalUsage: 16320 },
-                { date: '2024-10-08', dateDisplay: '2024/10', totalAmount: 79011, peakUsage: 7760, satHalfPeakUsage: 1440, offPeakUsage: 5760, totalUsage: 14960 },
-                { date: '2024-11-08', dateDisplay: '2024/11', totalAmount: 75860, peakUsage: 7200, satHalfPeakUsage: 1760, offPeakUsage: 7440, totalUsage: 16400 },
-                { date: '2024-12-08', dateDisplay: '2024/12', totalAmount: 69586, peakUsage: 6400, satHalfPeakUsage: 1200, offPeakUsage: 5680, totalUsage: 13280 },
-                { date: '2025-01-08', dateDisplay: '2025/01', totalAmount: 63641, peakUsage: 5680, satHalfPeakUsage: 1120, offPeakUsage: 4640, totalUsage: 11440 },
-                { date: '2025-02-08', dateDisplay: '2025/02', totalAmount: 61424, peakUsage: 5120, satHalfPeakUsage: 1280, offPeakUsage: 4800, totalUsage: 11200 },
-                { date: '2025-03-08', dateDisplay: '2025/03', totalAmount: 59022, peakUsage: 4560, satHalfPeakUsage: 720, offPeakUsage: 5760, totalUsage: 11040 },
-                { date: '2025-04-08', dateDisplay: '2025/04', totalAmount: 58467, peakUsage: 4880, satHalfPeakUsage: 960, offPeakUsage: 4400, totalUsage: 10240 },
-                { date: '2025-05-08', dateDisplay: '2025/05', totalAmount: 65367, peakUsage: 5600, satHalfPeakUsage: 1360, offPeakUsage: 5360, totalUsage: 12320 },
-                { date: '2025-06-08', dateDisplay: '2025/06', totalAmount: 63084, peakUsage: 5440, satHalfPeakUsage: 1200, offPeakUsage: 4880, totalUsage: 11520 }
+                { date: '2023-12-08', dateDisplay: '2023/12', billingPeriod: '2023/11/08 - 2023/12/07', totalAmount: 53645, peakUsage: 5760, satHalfPeakUsage: 1200, offPeakUsage: 5360, totalUsage: 12320 },
+                { date: '2024-02-08', dateDisplay: '2024/02', billingPeriod: '2023/12/08 - 2024/01/10', totalAmount: 53752, peakUsage: 5760, satHalfPeakUsage: 1200, offPeakUsage: 5360, totalUsage: 12320 },
+                { date: '2024-02-29', dateDisplay: '2024/03', billingPeriod: '2024/01/11 - 2024/02/14', totalAmount: 51362, peakUsage: 4880, satHalfPeakUsage: 880, offPeakUsage: 6080, totalUsage: 11840 },
+                { date: '2024-03-31', dateDisplay: '2024/04', billingPeriod: '2024/02/15 - 2024/03/12', totalAmount: 47922, peakUsage: 4560, satHalfPeakUsage: 1040, offPeakUsage: 4800, totalUsage: 10400 },
+                { date: '2024-04-30', dateDisplay: '2024/05', billingPeriod: '2024/03/13 - 2024/04/11', totalAmount: 54197, peakUsage: 5520, satHalfPeakUsage: 960, offPeakUsage: 5360, totalUsage: 11840 },
+                { date: '2024-05-31', dateDisplay: '2024/06', billingPeriod: '2024/04/12 - 2024/05/14', totalAmount: 63981, peakUsage: 6240, satHalfPeakUsage: 1520, offPeakUsage: 6560, totalUsage: 14320 },
+                { date: '2024-06-30', dateDisplay: '2024/07', billingPeriod: '2024/05/15 - 2024/06/12', totalAmount: 66056, peakUsage: 6240, satHalfPeakUsage: 1200, offPeakUsage: 6000, totalUsage: 13440 },
+                { date: '2024-08-08', dateDisplay: '2024/08', billingPeriod: '2024/06/13 - 2024/07/11', totalAmount: 76067, peakUsage: 7360, satHalfPeakUsage: 1360, offPeakUsage: 5680, totalUsage: 14400 },
+                { date: '2024-09-08', dateDisplay: '2024/09', billingPeriod: '2024/07/12 - 2024/08/13', totalAmount: 82279, peakUsage: 8240, satHalfPeakUsage: 1760, offPeakUsage: 6320, totalUsage: 16320 },
+                { date: '2024-10-08', dateDisplay: '2024/10', billingPeriod: '2024/08/14 - 2024/09/12', totalAmount: 79011, peakUsage: 7760, satHalfPeakUsage: 1440, offPeakUsage: 5760, totalUsage: 14960 },
+                { date: '2024-11-08', dateDisplay: '2024/11', billingPeriod: '2024/09/13 - 2024/10/14', totalAmount: 75860, peakUsage: 7200, satHalfPeakUsage: 1760, offPeakUsage: 7440, totalUsage: 16400 },
+                { date: '2024-12-08', dateDisplay: '2024/12', billingPeriod: '2024/10/15 - 2024/11/13', totalAmount: 69586, peakUsage: 6400, satHalfPeakUsage: 1200, offPeakUsage: 5680, totalUsage: 13280 },
+                { date: '2025-01-08', dateDisplay: '2025/01', billingPeriod: '2024/11/14 - 2024/12/12', totalAmount: 63641, peakUsage: 5680, satHalfPeakUsage: 1120, offPeakUsage: 4640, totalUsage: 11440 },
+                { date: '2025-02-08', dateDisplay: '2025/02', billingPeriod: '2024/12/13 - 2025/01/12', totalAmount: 61424, peakUsage: 5120, satHalfPeakUsage: 1280, offPeakUsage: 4800, totalUsage: 11200 },
+                { date: '2025-03-08', dateDisplay: '2025/03', billingPeriod: '2025/01/13 - 2025/02/11', totalAmount: 59022, peakUsage: 4560, satHalfPeakUsage: 720, offPeakUsage: 5760, totalUsage: 11040 },
+                { date: '2025-04-08', dateDisplay: '2025/04', billingPeriod: '2025/02/12 - 2025/03/12', totalAmount: 58467, peakUsage: 4880, satHalfPeakUsage: 960, offPeakUsage: 4400, totalUsage: 10240 },
+                { date: '2025-05-08', dateDisplay: '2025/05', billingPeriod: '2025/03/13 - 2025/04/13', totalAmount: 65367, peakUsage: 5600, satHalfPeakUsage: 1360, offPeakUsage: 5360, totalUsage: 12320 },
+                { date: '2025-06-08', dateDisplay: '2025/06', billingPeriod: '2025/04/14 - 2025/05/12', totalAmount: 63084, peakUsage: 5440, satHalfPeakUsage: 1200, offPeakUsage: 4880, totalUsage: 11520 }
             ];
 
             // 第二個電表資料
             const meter2Data = [
+                { period: '2023/12/08 - 2024/01/10', contractKW: 61, maxKW: 17, totalKWh: 4400, baseFee: 10565.2, flowFee: 12320.0, totalFee: 22542 },
+                { period: '2024/01/11 - 2024/02/14', contractKW: 61, maxKW: 6, totalKWh: 4640, baseFee: 10565.2, flowFee: 12992.0, totalFee: 23204 },
+                { period: '2024/02/15 - 2024/03/12', contractKW: 61, maxKW: 6, totalKWh: 3720, baseFee: 10565.2, flowFee: 10416.0, totalFee: 20667 },
                 { period: '2024/03/13 - 2024/04/11', contractKW: 61, maxKW: 7, totalKWh: 3960, baseFee: 10565.2, flowFee: 11755.9, totalFee: 21986 },
                 { period: '2024/04/12 - 2024/05/14', contractKW: 61, maxKW: 21, totalKWh: 4360, baseFee: 10565.2, flowFee: 14213.6, totalFee: 24407 },
                 { period: '2024/05/15 - 2024/06/12', contractKW: 61, maxKW: 8, totalKWh: 3880, baseFee: 12230.5, flowFee: 12937.7, totalFee: 24791 },
-                { period: '2024/06/13 - 2024/07/11', contractKW: 61, maxKW: 25, totalKWh: 4000, baseFee: 14408.2, flowFee: 15000.0, totalFee: 28000 },
+                { period: '2024/06/13 - 2024/07/11', contractKW: 61, maxKW: 22, totalKWh: 4040, baseFee: 14408.2, flowFee: 14408.2, totalFee: 27881 },
                 { period: '2024/07/12 - 2024/08/13', contractKW: 61, maxKW: 24, totalKWh: 4840, baseFee: 14408.2, flowFee: 16649.6, totalFee: 30592 },
                 { period: '2024/08/14 - 2024/09/12', contractKW: 61, maxKW: 30, totalKWh: 4240, baseFee: 14408.2, flowFee: 14585.6, totalFee: 28559 },
                 { period: '2024/09/13 - 2024/10/14', contractKW: 61, maxKW: 31, totalKWh: 5120, baseFee: 12871.0, flowFee: 17209.6, totalFee: 29629 },
@@ -1049,13 +1150,17 @@
                 { period: '2025/05/13 - 2025/06/10', contractKW: 30, maxKW: 26, totalKWh: 4400, baseFee: 8573.6, flowFee: 17346.6, totalFee: 25531 }
             ];
 
+            // 全局變量存儲圖表實例
+            let totalAmountChart, usageChart, stackedChart, totalUsageChart;
+            let currentXAxisMode = 'dateDisplay'; // 當前X軸顯示模式
+
             // 初始化第一個電表的圖表
             initializeCharts1();
 
             // 第一個電表的圖表初始化
             function initializeCharts1() {
                 // 提取資料
-                const labels = electricityData.map(d => d.dateDisplay);
+                const labels = getLabels(currentXAxisMode);
                 const totalAmounts = electricityData.map(d => d.totalAmount);
                 const peakUsages = electricityData.map(d => d.peakUsage);
                 const satHalfPeakUsages = electricityData.map(d => d.satHalfPeakUsage);
@@ -1091,10 +1196,11 @@
                             },
                             ticks: {
                                 font: {
-                                    size: isMobile ? 9 : 11
+                                    size: isMobile ? 9 : 11,
+                                    style: 'italic'
                                 },
-                                maxRotation: isMobile ? 45 : 0,
-                                minRotation: isMobile ? 45 : 0
+                                maxRotation: 45,
+                                minRotation: 45
                             }
                         },
                         y: {
@@ -1112,7 +1218,7 @@
 
                 // 1. 繳費總金額圖表
                 const totalAmountCtx = document.getElementById('totalAmountChart').getContext('2d');
-                new Chart(totalAmountCtx, {
+                totalAmountChart = new Chart(totalAmountCtx, {
                     type: 'line',
                     data: {
                         labels: labels,
@@ -1196,7 +1302,7 @@
                 ];
 
                 const usageCtx = document.getElementById('usageChart').getContext('2d');
-                const usageChart = new Chart(usageCtx, {
+                usageChart = new Chart(usageCtx, {
                     type: 'line',
                     data: {
                         labels: labels,
@@ -1247,7 +1353,7 @@
 
                 // 3. 用電量分佈堆疊圖
                 const stackedCtx = document.getElementById('stackedChart').getContext('2d');
-                new Chart(stackedCtx, {
+                stackedChart = new Chart(stackedCtx, {
                     type: 'bar',
                     data: {
                         labels: labels,
@@ -1300,7 +1406,7 @@
 
                 // 4. 總用電量趨勢圖
                 const totalUsageCtx = document.getElementById('totalUsageChart').getContext('2d');
-                new Chart(totalUsageCtx, {
+                totalUsageChart = new Chart(totalUsageCtx, {
                     type: 'line',
                     data: {
                         labels: labels,
@@ -1528,6 +1634,74 @@
 
                 // 計算並顯示統計數據
                 calculateAndDisplayStats();
+
+                // 初始化X軸切換按鈕事件監聽器
+                initializeXAxisToggleListeners();
+            }
+
+            // 獲取標籤的輔助函數
+            function getLabels(mode) {
+                return electricityData.map(d => mode === 'dateDisplay' ? d.dateDisplay : d.billingPeriod);
+            }
+
+            // 更新圖表X軸標籤
+            function updateChartsXAxis(mode) {
+                const newLabels = getLabels(mode);
+                
+                if (totalAmountChart) {
+                    totalAmountChart.data.labels = newLabels;
+                    totalAmountChart.update();
+                }
+                
+                if (usageChart) {
+                    usageChart.data.labels = newLabels;
+                    usageChart.update();
+                }
+                
+                if (stackedChart) {
+                    stackedChart.data.labels = newLabels;
+                    stackedChart.update();
+                }
+                
+                if (totalUsageChart) {
+                    totalUsageChart.data.labels = newLabels;
+                    totalUsageChart.update();
+                }
+            }
+
+            // 初始化X軸切換按鈕事件監聽器
+            function initializeXAxisToggleListeners() {
+                // 為每個圖表的切換按鈕添加事件監聽器
+                const toggleContainers = ['totalAmountToggle', 'usageToggle', 'stackedToggle', 'totalUsageToggle'];
+                
+                toggleContainers.forEach(containerId => {
+                    const container = document.getElementById(containerId);
+                    if (container) {
+                        const buttons = container.querySelectorAll('.toggle-btn');
+                        buttons.forEach(btn => {
+                            btn.addEventListener('click', function() {
+                                const mode = this.getAttribute('data-mode');
+                                
+                                // 更新所有切換按鈕的狀態
+                                toggleContainers.forEach(id => {
+                                    const cont = document.getElementById(id);
+                                    if (cont) {
+                                        cont.querySelectorAll('.toggle-btn').forEach(b => {
+                                            b.classList.remove('active');
+                                            if (b.getAttribute('data-mode') === mode) {
+                                                b.classList.add('active');
+                                            }
+                                        });
+                                    }
+                                });
+                                
+                                // 更新全局模式並重新渲染圖表
+                                currentXAxisMode = mode;
+                                updateChartsXAxis(mode);
+                            });
+                        });
+                    }
+                });
             }
 
             // 計算並顯示統計數據
@@ -1582,7 +1756,7 @@
                         </div>
                     </div>
                     <div class="chart-container delay-10">
-                        <div class="chart-title">💵💸 基本電費/流動電費趨勢</div>
+                        <div class="chart-title">💵 基本電費/流動電費趨勢</div>
                         <div class="chart-wrapper">
                             <canvas id="meter2FeesChart"></canvas>
                         </div>
@@ -1990,3 +2164,4 @@
     </script>
 </body>
 </html>
+
