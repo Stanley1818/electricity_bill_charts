@@ -770,7 +770,7 @@
     <div class="container">
         <h1>🏢 社區電費紀錄分析圖表</h1>
         <div class="last-updated">
-            <span>📅 資料最後更新日期：2025年7月2日</span>
+            <span>📅 資料最後更新日期：2025年7月9日</span>
         </div>
         
         <!-- Tab 切換器 -->
@@ -1125,7 +1125,8 @@
                 { date: '2025-03-08', dateDisplay: '2025/03', billingPeriod: '2025/01/13 - 2025/02/11', totalAmount: 59022, peakUsage: 4560, satHalfPeakUsage: 720, offPeakUsage: 5760, totalUsage: 11040 },
                 { date: '2025-04-08', dateDisplay: '2025/04', billingPeriod: '2025/02/12 - 2025/03/12', totalAmount: 58467, peakUsage: 4880, satHalfPeakUsage: 960, offPeakUsage: 4400, totalUsage: 10240 },
                 { date: '2025-05-08', dateDisplay: '2025/05', billingPeriod: '2025/03/13 - 2025/04/13', totalAmount: 65367, peakUsage: 5600, satHalfPeakUsage: 1360, offPeakUsage: 5360, totalUsage: 12320 },
-                { date: '2025-06-08', dateDisplay: '2025/06', billingPeriod: '2025/04/14 - 2025/05/12', totalAmount: 63084, peakUsage: 5440, satHalfPeakUsage: 1200, offPeakUsage: 4880, totalUsage: 11520 }
+                { date: '2025-06-08', dateDisplay: '2025/06', billingPeriod: '2025/04/14 - 2025/05/12', totalAmount: 63084, peakUsage: 5440, satHalfPeakUsage: 1200, offPeakUsage: 4880, totalUsage: 11520 },
+                { date: '2025-07-01', dateDisplay: '2025/07', billingPeriod: '2025/05/13 - 2025/06/10', totalAmount: 67534, peakUsage: 7040, satHalfPeakUsage: 1040, offPeakUsage: 5760, totalUsage: 13840 }
             ];
 
             // 第二個電表資料
@@ -1443,7 +1444,7 @@
                 });
 
                 // 年度對比資料準備
-                const comparisonMonths = ['03', '04', '05', '06'];
+                const comparisonMonths = ['03', '04', '05', '06', '07'];
                 
                 const data2024 = electricityData.filter(d => 
                     d.dateDisplay.includes('2024') && 
@@ -2164,4 +2165,3 @@
     </script>
 </body>
 </html>
-
